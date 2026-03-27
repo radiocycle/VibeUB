@@ -1,0 +1,27 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vibe"
+version = "0.1.0"
+description = "Vibe Telegram userbot with modular architecture and inline support."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "Vibe" }
+]
+dependencies = [
+  "aiogram>=3.18.0",
+  "kurigram>=2.2.8",
+  "aiohttp>=3.11.0",
+]
+
+[project.scripts]
+vibe = "vibe.main:cli"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["vibe*"]

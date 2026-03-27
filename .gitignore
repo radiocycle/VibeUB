@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+*.pyo
+*.session
+*.session-journal
+*.log
+config.json
+.venv/
+logs/
+modules/
+terminal-output.txt
