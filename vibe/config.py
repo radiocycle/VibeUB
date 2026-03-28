@@ -21,6 +21,7 @@ class AppConfig:
     api_hash: str = ""
     session_name: str = "vibe"
     owner_id: int | None = None
+    language: str = "en"
     prefix: str = "."
     workdir: str = "."
     modules_dir: str = "modules"
@@ -100,6 +101,7 @@ class ConfigManager:
         self._config.api_hash = payload.get("api_hash", self._config.api_hash)
         self._config.session_name = payload.get("session_name", self._config.session_name)
         self._config.owner_id = payload.get("owner_id", self._config.owner_id)
+        self._config.language = payload.get("language", self._config.language)
         self._config.prefix = payload.get("prefix", self._config.prefix)
         self._config.aliases = payload.get("aliases", {})
         self._config.module_settings = payload.get("module_settings", {})
@@ -129,6 +131,10 @@ class ConfigManager:
 
     def set_prefix(self, prefix: str) -> None:
         self._config.prefix = prefix
+        self.save()
+
+    def set_language(self, language: str) -> None:
+        self._config.language = language
         self.save()
 
     def set_alias(self, alias: str, expansion: str) -> None:

@@ -26,7 +26,11 @@ class ModuleOption:
     key: str
     label: str
     description: str
-    value: str = ""
+    value: Any = ""
+    editable: bool = False
+    placeholders: tuple[tuple[str, str], ...] = ()
+    value_type: str = "string"
+    choices: tuple[str, ...] = ()
 
 
 def command(name: str, *, help_text: str = "", aliases: tuple[str, ...] = ()) -> Callable[[CommandCallable], CommandCallable]:

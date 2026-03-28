@@ -20,6 +20,7 @@ from vibe.core.botfather import BotFatherService
 from vibe.core.context import CommandContext
 from vibe.core.inline import InlineManager
 from vibe.core.loader import ModuleManager
+from vibe.i18n import Localizer
 from vibe.logging import setup_logging
 
 LOGGER = logging.getLogger(__name__)
@@ -39,6 +40,7 @@ class VibeUB:
         self.modules = ModuleManager(self)
         self.inline = InlineManager(self)
         self.botfather = BotFatherService(self.client)
+        self.i18n = Localizer(self)
         self.started_at = perf_counter()
         self.me: Any = None
         self._restart_requested = False
@@ -133,7 +135,7 @@ class VibeUB:
         except Exception as exc:
             LOGGER.exception("Command %s failed", command.name)
             await ctx.reply(
-                "<b>Command Failed</b>\n"
+                "<b>❌ Command Failed</b>\n"
                 f"Command: <code>{command.name}</code>\n"
                 f"Error: <code>{type(exc).__name__}: {exc}</code>"
             )

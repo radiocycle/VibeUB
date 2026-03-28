@@ -9,7 +9,7 @@ from aiogram import Bot, Dispatcher, Router
 from aiogram.client.default import DefaultBotProperties
 from aiogram.filters import CommandStart
 from aiogram.enums import ParseMode
-from aiogram.types import CallbackQuery, InlineKeyboardButton, InlineKeyboardMarkup, InlineQuery, Message
+from aiogram.types import CallbackQuery, ChosenInlineResult, InlineKeyboardButton, InlineKeyboardMarkup, InlineQuery, Message
 
 from vibe.core.context import InlineQueryContext
 
@@ -52,6 +52,10 @@ class InlineManager:
         async def on_start(message: Message) -> None:
             await self._handle_start(message)
 
+        @router.chosen_inline_result()
+        async def on_chosen_inline_result(result: ChosenInlineResult) -> None:
+            await self._handle_chosen_inline_result(result)
+
         self._dispatcher.include_router(router)
         self._task = asyncio.create_task(
             self._dispatcher.start_polling(self._bot, handle_signals=False)
@@ -79,6 +83,12 @@ class InlineManager:
         text = (query.query or "").strip()
         command_name, _, _ = text.partition(" ")
         ctx = InlineQueryContext(app=self.app, query=query)
+        config_module = self.app.modules.get_module("config")
+        if config_module is not None:
+            custom_results = config_module.build_edit_inline_results(ctx)
+            if custom_results is not None:
+                await query.answer(results=custom_results, cache_time=1, is_personal=True)
+                return
         if command_name and command_name in self.app.modules.inline_handlers:
             handler = self.app.modules.inline_handlers[command_name]
             results = await handler.callback(ctx)
@@ -91,12 +101,12 @@ class InlineManager:
         commands = ", ".join(cmd.name for cmd in self.app.modules.list_primary_commands())
         return [
             ctx.article(
-                title="Vibe Inline",
-                description="Runtime status and available commands",
-                message_text=(
-                    "<b>Vibe Inline</b>\n"
-                    f"Prefix: <code>{prefix}</code>\n"
-                    f"Commands: <code>{commands}</code>"
+                title=ctx.app.i18n.text("inline_default_title"),
+                description=ctx.app.i18n.text("inline_default_description"),
+                message_text=ctx.app.i18n.text(
+                    "inline_default_text",
+                    prefix=prefix,
+                    commands=commands,
                 ),
             )
         ]
@@ -104,14 +114,18 @@ class InlineManager:
     async def _handle_start(self, message: Message) -> None:
         prefix = self.app.config.prefix
         inline_username = self.app.config.inline.bot_username or "not configured"
-        text = (
-            "<b>Vibe Inline Bot</b>\n"
-            "Inline mode is ready.\n\n"
-            f"Bot: <code>{inline_username}</code>\n"
-            f"Prefix: <code>{prefix}</code>\n"
-            "Use the bot inline in any chat and call <code>config</code> or <code>info</code>."
+        text = self.app.i18n.text(
+            "inline_start",
+            inline_username=inline_username,
+            prefix=prefix,
         )
         await message.answer(text)
+
+    async def _handle_chosen_inline_result(self, result: ChosenInlineResult) -> None:
+        config_module = self.app.modules.get_module("config")
+        if config_module is None:
+            return
+        config_module.apply_inline_result(result.result_id)
 
     async def _handle_callback(self, query: CallbackQuery) -> None:
         data = query.data or ""
@@ -121,27 +135,65 @@ class InlineManager:
 
         config_module = self.app.modules.get_module("config")
         if config_module is None:
-            await query.answer("Config module is not loaded.", show_alert=True)
+            await query.answer("⚠️ Config module is not loaded.", show_alert=True)
             return
 
         parts = data.split(":")
         action = parts[1] if len(parts) > 1 else ""
         if action == "root":
-            await query.message.edit_text(
-                "Vibe config panel",
-                reply_markup=config_module._modules_keyboard(),
+            await self._edit_callback_message(
+                query,
+                text=self.app.i18n.text("config_panel_title"),
+                reply_markup=config_module._root_keyboard(),
             )
             await query.answer()
+            return
+        if action == "category" and len(parts) == 3:
+            category = parts[2]
+            await self._edit_callback_message(
+                query,
+                text=self.app.i18n.text("config_panel_title"),
+                reply_markup=config_module._category_keyboard(category),
+            )
+            await query.answer()
+            return
+        if action == "language":
+            await self._edit_callback_message(
+                query,
+                text=self.app.i18n.text("config_language_title", language=self.app.config.language),
+                reply_markup=config_module._language_keyboard(),
+            )
+            await query.answer()
+            return
+        if action == "setlang" and len(parts) == 3:
+            language = parts[2]
+            if language not in {"en", "ru"}:
+                await query.answer("❌ Language not found.", show_alert=True)
+                return
+            self.app.config_manager.set_language(language)
+            self.app.config.language = language
+            await self._edit_callback_message(
+                query,
+                text=self.app.i18n.text("config_language_title", language=self.app.config.language),
+                reply_markup=config_module._language_keyboard(),
+            )
+            await query.answer(self.app.i18n.text("config_language_saved", language=language), show_alert=True)
             return
         if action == "module" and len(parts) == 3:
             module_name = parts[2]
             module = self.app.modules.modules.get(module_name)
             if module is None:
-                await query.answer("Module not found.", show_alert=True)
+                await query.answer(self.app.i18n.text("config_module_not_found"), show_alert=True)
                 return
             keyboard = config_module.build_module_keyboard(module_name)
-            await query.message.edit_text(
-                f"{module.title} ({module.name})\n{module.description}",
+            await self._edit_callback_message(
+                query,
+                text=self.app.i18n.text(
+                    "config_module_title",
+                    title=module.title,
+                    name=module.name,
+                    description=module.description,
+                ),
                 reply_markup=keyboard,
             )
             await query.answer()
@@ -151,15 +203,65 @@ class InlineManager:
             option_key = parts[3]
             module = self.app.modules.modules.get(module_name)
             if module is None:
-                await query.answer("Module not found.", show_alert=True)
+                await query.answer(self.app.i18n.text("config_module_not_found"), show_alert=True)
                 return
-            option = next((item for item in module.get_options() if item.key == option_key), None)
+            option = config_module.get_module_option(module_name, option_key)
             if option is None:
-                await query.answer("Option not found.", show_alert=True)
+                await query.answer(self.app.i18n.text("config_option_not_found"), show_alert=True)
                 return
-            await query.answer(f"{option.label}: {option.value}\n{option.description}", show_alert=True)
+            await self._edit_callback_message(
+                query,
+                text=config_module.render_option_text(module_name, option),
+                reply_markup=config_module.build_option_keyboard(module_name, option_key),
+            )
+            await query.answer()
+            return
+        if action == "set" and len(parts) >= 5:
+            module_name = parts[2]
+            option_key = parts[3]
+            raw_value = ":".join(parts[4:])
+            option = config_module.get_module_option(module_name, option_key)
+            if option is None:
+                await query.answer(self.app.i18n.text("config_option_not_found"), show_alert=True)
+                return
+            is_valid, parsed_value, error = config_module.validate_option_value(option, raw_value)
+            if not is_valid:
+                await query.answer(error or "Invalid value.", show_alert=True)
+                return
+            self.app.config_manager.set_module_option(module_name, option_key, parsed_value)
+            refreshed_option = config_module.get_module_option(module_name, option_key)
+            if refreshed_option is None:
+                await query.answer(self.app.i18n.text("config_option_not_found"), show_alert=True)
+                return
+            await self._edit_callback_message(
+                query,
+                text=config_module.render_option_text(module_name, refreshed_option),
+                reply_markup=config_module.build_option_keyboard(module_name, option_key),
+            )
+            await query.answer(f"✅ {option.label}: {parsed_value}", show_alert=True)
             return
         if action == "none":
-            await query.answer("No modules available.", show_alert=True)
+            await query.answer("📭", show_alert=True)
             return
         await query.answer()
+
+    async def _edit_callback_message(
+        self,
+        query: CallbackQuery,
+        *,
+        text: str,
+        reply_markup: InlineKeyboardMarkup | None = None,
+    ) -> None:
+        if query.message is not None:
+            await query.message.edit_text(text, reply_markup=reply_markup)
+            return
+
+        inline_message_id = query.inline_message_id
+        if inline_message_id is None or self._bot is None:
+            raise RuntimeError("No editable message target in callback query.")
+
+        await self._bot.edit_message_text(
+            text=text,
+            inline_message_id=inline_message_id,
+            reply_markup=reply_markup,
+        )
