@@ -204,6 +204,15 @@ class ConfigModule(BaseModule):
                         )
                     ]
                 )
+        if option is not None and option.default is not None:
+            rows.append(
+                [
+                    InlineKeyboardButton(
+                        text="♻️ Restore Default",
+                        callback_data=f"cfg:reset:{module_name}:{option_key}",
+                    )
+                ]
+            )
         rows.append([InlineKeyboardButton(text=self.app.i18n.text("config_back"), callback_data=f"cfg:module:{module_name}")])
         return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -224,6 +233,13 @@ class ConfigModule(BaseModule):
             f"💾 Current Value:\n<blockquote expandable><code>{html.escape(str(value))}</code></blockquote>",
             f"📝 Description:\n{option.description}",
         ]
+        if option.default is not None:
+            default_value = option.default
+            if default_value == "":
+                default_value = "empty"
+            lines.append(
+                f"♻️ Default Value:\n<blockquote expandable><code>{html.escape(str(default_value))}</code></blockquote>"
+            )
         if option.placeholders:
             placeholders = "\n".join(
                 f"• <code>{html.escape(name)}</code> - {html.escape(description)}"

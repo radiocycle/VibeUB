@@ -7,5 +7,5 @@ __pycache__/
 config.json
 .venv/
 logs/
-modules/
+/modules/
 terminal-output.txt

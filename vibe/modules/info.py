@@ -7,20 +7,22 @@ from vibe.core import BaseModule, ModuleOption, command, inline_handler
 
 
 DEFAULT_INFO_TEMPLATE = (
-    "<b>ℹ️ Vibe Information</b>\n"
-    "👤 User: <code>@{username}</code>\n"
-    "🪪 Name: <code>{first_name}</code>\n"
+    "<b>🌌 VibeUB Info</b>\n"
+    "👤 Username: <code>@{username}</code>\n"
+    "🪪 First Name: <code>{first_name}</code>\n"
     "🆔 User ID: <code>{user_id}</code>\n"
     "🧬 Version: <code>{version}</code>\n"
     "🧩 Modules: <code>{modules_count}</code>\n"
-    "🤖 Inline bot: <code>{inline_bot}</code>\n"
-    "⏱ Uptime: <code>{uptime}</code>"
+    "🤖 Inline Bot: <code>{inline_bot}</code>\n"
+    "⏳ Uptime: <code>{uptime}</code>"
 )
 
 DEFAULT_INLINE_INFO_TEMPLATE = (
-    "<b>ℹ️ Vibe Information</b>\n"
-    "👤 User: <code>@{username}</code>\n"
-    "🧩 Modules: <code>{modules_count}</code>"
+    "<b>🌌 VibeUB Info</b>\n"
+    "👤 Username: <code>@{username}</code>\n"
+    "🧬 Version: <code>{version}</code>\n"
+    "🧩 Modules: <code>{modules_count}</code>\n"
+    "⏳ Uptime: <code>{uptime}</code>"
 )
 
 DEFAULT_INLINE_INFO_BANNER_URL = ""
@@ -60,7 +62,7 @@ class InfoModule(BaseModule):
         template = ctx.app.config_manager.get_module_option(
             self.name,
             "custom_text",
-            ctx.app.config_manager.get_module_option(self.name, "template", DEFAULT_INFO_TEMPLATE),
+            DEFAULT_INFO_TEMPLATE,
         )
         try:
             rendered = template.format_map(self._placeholders(ctx.app, me, uptime, inline_username))
@@ -99,7 +101,7 @@ class InfoModule(BaseModule):
         template = query.app.config_manager.get_module_option(
             self.name,
             "custom_text",
-            query.app.config_manager.get_module_option(self.name, "inline_template", DEFAULT_INLINE_INFO_TEMPLATE),
+            DEFAULT_INLINE_INFO_TEMPLATE,
         )
         uptime = perf_counter() - query.app.started_at
         inline_username = query.app.config.inline.bot_username or "not configured"
@@ -139,8 +141,9 @@ class InfoModule(BaseModule):
                 value=self.app.config_manager.get_module_option(
                     self.name,
                     "custom_text",
-                    self.app.config_manager.get_module_option(self.name, "template", DEFAULT_INFO_TEMPLATE),
+                    DEFAULT_INFO_TEMPLATE,
                 )[:48] + "...",
+                default=DEFAULT_INFO_TEMPLATE,
                 editable=True,
                 placeholders=INFO_PLACEHOLDERS,
                 value_type="string",
@@ -150,6 +153,7 @@ class InfoModule(BaseModule):
                 label="Banner URL",
                 description="URL used as webpage preview source for commands and thumbnail for inline results.",
                 value=self.app.config_manager.get_module_option(self.name, "banner_url", DEFAULT_INLINE_INFO_BANNER_URL) or "not set",
+                default=DEFAULT_INLINE_INFO_BANNER_URL,
                 editable=True,
                 value_type="string",
             ),
@@ -164,6 +168,7 @@ class InfoModule(BaseModule):
                         DEFAULT_INLINE_INFO_QUOTE_MEDIA,
                     )
                 ).lower(),
+                default=DEFAULT_INLINE_INFO_QUOTE_MEDIA,
                 editable=True,
                 value_type="boolean",
             ),
@@ -178,6 +183,7 @@ class InfoModule(BaseModule):
                         DEFAULT_INLINE_INFO_INVERT_MEDIA,
                     )
                 ).lower(),
+                default=DEFAULT_INLINE_INFO_INVERT_MEDIA,
                 editable=True,
                 value_type="boolean",
             ),

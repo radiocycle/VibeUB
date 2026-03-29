@@ -175,6 +175,16 @@ class ConfigManager:
         module_payload[key] = value
         self.save()
 
+    def reset_module_option(self, module_name: str, key: str) -> bool:
+        module_payload = self._config.module_settings.get(module_name)
+        if not module_payload or key not in module_payload:
+            return False
+        module_payload.pop(key, None)
+        if not module_payload:
+            self._config.module_settings.pop(module_name, None)
+        self.save()
+        return True
+
 
 def _int_or_none(value: str | None) -> int | None:
     if value is None or not value.strip():

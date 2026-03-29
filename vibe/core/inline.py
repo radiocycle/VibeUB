@@ -79,7 +79,17 @@ class InlineManager:
             await self.stop()
         await self.start()
 
+    def _owner_id(self) -> int | None:
+        return self.app.config.owner_id or getattr(self.app.me, "id", None)
+
+    def _is_owner(self, user_id: int | None) -> bool:
+        owner_id = self._owner_id()
+        return owner_id is not None and user_id == owner_id
+
     async def _handle_inline_query(self, query: InlineQuery) -> None:
+        if not self._is_owner(getattr(getattr(query, "from_user", None), "id", None)):
+            await query.answer(results=[], cache_time=1, is_personal=True)
+            return
         text = (query.query or "").strip()
         command_name, _, _ = text.partition(" ")
         ctx = InlineQueryContext(app=self.app, query=query)
@@ -112,6 +122,8 @@ class InlineManager:
         ]
 
     async def _handle_start(self, message: Message) -> None:
+        if not self._is_owner(getattr(getattr(message, "from_user", None), "id", None)):
+            return
         prefix = self.app.config.prefix
         inline_username = self.app.config.inline.bot_username or "not configured"
         text = self.app.i18n.text(
@@ -122,12 +134,17 @@ class InlineManager:
         await message.answer(text)
 
     async def _handle_chosen_inline_result(self, result: ChosenInlineResult) -> None:
+        if not self._is_owner(getattr(getattr(result, "from_user", None), "id", None)):
+            return
         config_module = self.app.modules.get_module("config")
         if config_module is None:
             return
         config_module.apply_inline_result(result.result_id)
 
     async def _handle_callback(self, query: CallbackQuery) -> None:
+        if not self._is_owner(getattr(getattr(query, "from_user", None), "id", None)):
+            await query.answer("⛔", show_alert=True)
+            return
         data = query.data or ""
         if not data.startswith("cfg:"):
             await query.answer()
@@ -239,6 +256,25 @@ class InlineManager:
                 reply_markup=config_module.build_option_keyboard(module_name, option_key),
             )
             await query.answer(f"✅ {option.label}: {parsed_value}", show_alert=True)
+            return
+        if action == "reset" and len(parts) == 4:
+            module_name = parts[2]
+            option_key = parts[3]
+            option = config_module.get_module_option(module_name, option_key)
+            if option is None:
+                await query.answer(self.app.i18n.text("config_option_not_found"), show_alert=True)
+                return
+            self.app.config_manager.reset_module_option(module_name, option_key)
+            refreshed_option = config_module.get_module_option(module_name, option_key)
+            if refreshed_option is None:
+                await query.answer(self.app.i18n.text("config_option_not_found"), show_alert=True)
+                return
+            await self._edit_callback_message(
+                query,
+                text=config_module.render_option_text(module_name, refreshed_option),
+                reply_markup=config_module.build_option_keyboard(module_name, option_key),
+            )
+            await query.answer(f"♻️ {option.label} restored", show_alert=True)
             return
         if action == "none":
             await query.answer("📭", show_alert=True)

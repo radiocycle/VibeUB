@@ -27,6 +27,7 @@ class ModuleOption:
     label: str
     description: str
     value: Any = ""
+    default: Any = None
     editable: bool = False
     placeholders: tuple[tuple[str, str], ...] = ()
     value_type: str = "string"
